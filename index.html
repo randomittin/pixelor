@@ -59,8 +59,19 @@
             <sc-for list="{{ brushes }}" as="b" hint-placeholder-count="0">
               <button onClick="{{ b.onPick }}" title="{{ b.label }}" style="width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 700; background: {{ b.hex }}; color: {{ b.fg }}; border: {{ b.border }};">{{ b.char }}</button>
             </sc-for>
+            <sc-if value="{{ canAddColor }}" hint-placeholder-val="{{ true }}">
+              <label title="add a new color" style="position: relative; width: 26px; height: 26px; border-radius: 4px; border: 1px dashed #3d5c60; color: #7fd4c1; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; line-height: 1;" style-hover="border-color: #7fd4c1; background: #182629;">+
+                <input type="color" onInput="{{ addColorNew }}" style="position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; border: none; padding: 0; cursor: pointer;">
+              </label>
+            </sc-if>
+            <sc-if value="{{ showRecolor }}" hint-placeholder-val="{{ false }}">
+              <label title="recolor the active brush" style="position: relative; display: flex; align-items: center; gap: 5px; font-size: 10px; color: #7f9c96; cursor: pointer; margin-left: 4px;">recolor
+                <span style="width: 20px; height: 20px; border-radius: 3px; border: 1px solid #24393c; background: {{ activeBrushHex }};"></span>
+                <input type="color" value="{{ activeBrushHex }}" onInput="{{ recolorActive }}" style="position: absolute; right: 0; width: 20px; height: 20px; opacity: 0; border: none; padding: 0; cursor: pointer;">
+              </label>
+            </sc-if>
           </div>
-          <div style="font-size: 10px; color: #55716d;">pick a color → click pixels in the preview · click a filled pixel with its own color to erase to bg (.)</div>
+          <div style="font-size: 10px; color: #55716d;">pick a color → click pixels in the preview · <b style="color:#7fd4c1;">+</b> adds a new color · click a filled pixel with its own color to erase to bg (.)</div>
         </div>
 
         <div style="background: #121c1e; border: 1px solid #1c2e30; border-radius: 5px; padding: 12px 14px;">
@@ -302,6 +313,23 @@ class Component extends DCLogic {
     const entry = this.buildEntry(grid, this.state.slotHex, this.state.bgHex, this.state.name);
     this.setState({ grid, entry, copied: false });
   }
+  // Add a brand-new paint color the quantizer didn't produce. It claims the next
+  // free alphabet slot (1..7) and becomes the active brush; it only appears in the
+  // exported block once you actually paint a pixel with it.
+  addColor(hexStr) {
+    const used = this.state.slotHex || {};
+    const free = ['1','2','3','4','5','6','7'].find(r => !used[r]);
+    if (!free) { this.setState({ error: 'all 7 color slots are in use — recolor or merge one first' }); return; }
+    this.setState({ slotHex: Object.assign({}, used, { [free]: hexStr }), brush: free, error: '' });
+  }
+  // Recolor an existing slot (quantizer- or hand-added). Rebuilds the block header
+  // + repaints every pixel of that slot in the preview.
+  recolorSlot(role, hexStr) {
+    if (!role || role === '.') return;
+    const slotHex = Object.assign({}, this.state.slotHex, { [role]: hexStr });
+    const entry = this.state.grid ? this.buildEntry(this.state.grid, slotHex, this.state.bgHex, this.state.name) : this.state.entry;
+    this.setState({ slotHex, entry });
+  }
 
   // ---------- palette edits ----------
   setMaxColors(n) {
@@ -373,6 +401,11 @@ class Component extends DCLogic {
           };
         });
       })(),
+      canAddColor: Object.keys(st.slotHex || {}).length < 7,
+      addColorNew: (ev) => this.addColor(ev.target.value),
+      showRecolor: st.brush !== '.' && !!(st.slotHex && st.slotHex[st.brush]),
+      activeBrushHex: (st.slotHex && st.slotHex[st.brush]) || '#7fd4c1',
+      recolorActive: (ev) => this.recolorSlot(st.brush, ev.target.value),
       palette: pal.map((p, idx) => {
         const hx = this.hex(p);
         return {
