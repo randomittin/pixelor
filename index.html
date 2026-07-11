@@ -200,6 +200,17 @@ class Component extends DCLogic {
       palette.forEach((k, j) => { const dd = this.dist(p, k); if (dd < bd) { bd = dd; bi = j; } });
       return bi;
     };
+    // Reference color the cell "reads as" filler: the true background if we found
+    // one, else the dominant palette color (palette[0] is the most frequent). Pixels
+    // FAR from this reference are salient — eyes, outlines, muzzle edges — and must
+    // be able to win a cell even when they're a small minority of its pixels.
+    const ref = bgColor || palette[0] || { r: 128, g: 128, b: 128 };
+    // Contrast weight: a pixel's vote scales with how far it sits from the filler.
+    // SALIENCE_GAIN sets how strongly features punch above their pixel count; the
+    // /100 normalizes RGB distance to a ~0..4 range. Tuned so a couple of eye pixels
+    // beat a cell of fur, without a single stray pixel hijacking the cell.
+    const SALIENCE_GAIN = 3;
+    const weightOf = (p) => 1 + SALIENCE_GAIN * (this.dist(p, ref) / 100);
     const cellW = W / 8, cellH = H / 8;
     for (let cy = 0; cy < 8; cy++) for (let cx = 0; cx < 8; cx++) {
       const votes = new Array(palette.length).fill(0);
@@ -210,7 +221,7 @@ class Component extends DCLogic {
         const i = (y*W + x)*4; tot++;
         const p = { r: fd[i], g: fd[i+1], b: fd[i+2] };
         if (fd[i+3] < 128 || (bgColor && this.dist(p, bgColor) < 60)) { bgVotes++; continue; }
-        votes[nearestIdx(p)]++;
+        votes[nearestIdx(p)] += weightOf(p);
       }
       let best = -1, bn = 0;
       votes.forEach((v, j) => { if (v > bn) { bn = v; best = j; } });
