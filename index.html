@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta charset="utf-8">
+  <title>Sigil — 8×8 Sprite Converter</title>
+  <style>
+    body { margin: 0; background: #0d1416; }
+    a { color: #7fd4c1; } a:hover { color: #aef0e0; }
+    ::selection { background: rgba(127,212,193,0.3); }
+    select { -webkit-appearance: none; appearance: none; }
+  </style>
+  <script src="sprites8-data.js"></script>
+</helmet>
+<div style="min-height: 100vh; background: #0d1416; color: #dfe9e6; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; padding: 28px 32px 64px 32px; box-sizing: border-box;">
+
+  <div data-screen-label="Header" style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 6px;">
+    <div style="font-size: 22px; font-weight: 700; letter-spacing: 0.04em; color: #f0f8ff;">HEIMDALL SIGIL</div>
+    <div style="font-size: 13px; color: #7fd4c1;">image → 8×8 delivery block converter</div>
+    <div style="flex: 1;"></div>
+    <a href="Sigil Sprite Library 8x8.dc.html" style="font-size: 12px;">→ 8×8 library</a>
+  </div>
+
+  <div style="font-size: 11px; color: #5d7a76; margin-bottom: 22px;">drop any image (or an 8×8 pixel sprite) — it builds a top-N color palette, then majority-votes each 8×8 cell. edit or merge palette colors below. alphabet: . bg | 1 body | 2 eye | 3 highlight | 4 shadow | 5 outline | 6 accent-A | 7 accent-B</div>
+
+  <label style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 1px dashed #2c4448; border-radius: 6px; padding: 28px; cursor: pointer; margin-bottom: 22px; background: #101a1c;" style-hover="border-color: #3d5c60; background: #121c1e;">
+    <div style="font-size: 13px; color: #7fd4c1;">{{ dropLabel }}</div>
+    <div style="font-size: 11px; color: #46605c;">png · jpg · gif · webp — transparent pixels become bg; otherwise the corner color is treated as bg</div>
+    <input type="file" accept="image/*" onChange="{{ onFile }}" style="display: none;">
+  </label>
+
+  <sc-if value="{{ hasResult }}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start;">
+
+      <div style="display: flex; flex-direction: column; gap: 14px; width: 300px;">
+        <div style="background: #121c1e; border: 1px solid #1c2e30; border-radius: 5px; padding: 14px; display: flex; justify-content: center;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+            <div style="position: relative; width: 200px; height: 200px; border: 1px solid #1c2e30;">
+              <div role="img" aria-label="quantized sprite" style="position: absolute; inset: 0; background-image: url({{ srcPng }}); background-size: contain; background-repeat: no-repeat; image-rendering: pixelated;"></div>
+              <div style="position: absolute; inset: 0; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); pointer-events: none;">
+                <sc-for list="{{ cells }}" as="c" hint-placeholder-count="64">
+                  <div style="box-sizing: border-box; border: {{ c.border }}; background: {{ c.bg }};"></div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="font-size: 10px; color: #55716d;">8×8 · quantized to palette</div>
+          </div>
+        </div>
+
+        <div style="background: #121c1e; border: 1px solid #1c2e30; border-radius: 5px; padding: 12px 14px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+            <span style="font-size: 11px; color: #cfe0dc; letter-spacing: 0.05em;">MAX COLORS</span>
+            <button onClick="{{ decColors }}" style="background: #1a2a2e; color: #7fd4c1; border: 1px solid #2c4448; border-radius: 3px; width: 24px; height: 24px; cursor: pointer; font-family: inherit; font-size: 14px;">−</button>
+            <span style="font-size: 14px; color: #f0f8ff; width: 16px; text-align: center;">{{ maxColors }}</span>
+            <button onClick="{{ incColors }}" style="background: #1a2a2e; color: #7fd4c1; border: 1px solid #2c4448; border-radius: 3px; width: 24px; height: 24px; cursor: pointer; font-family: inherit; font-size: 14px;">+</button>
+            <div style="flex: 1;"></div>
+            <button onClick="{{ resetPalette }}" style="background: none; color: #55716d; border: 1px solid #24393c; border-radius: 3px; padding: 3px 8px; cursor: pointer; font-family: inherit; font-size: 10px;">reset</button>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <sc-for list="{{ palette }}" as="p" hint-placeholder-count="0">
+              <div onMouseEnter="{{ p.onEnter }}" onMouseLeave="{{ p.onLeave }}" style="display: flex; align-items: center; gap: 7px; font-size: 11px; padding: 2px 4px; margin: -2px -4px; border-radius: 4px; cursor: default;" style-hover="background: #182629;">
+                <label style="position: relative; width: 22px; height: 22px; border-radius: 3px; border: 1px solid #24393c; cursor: pointer; overflow: hidden; background: {{ p.hex }}; flex-shrink: 0;">
+                  <input type="color" value="{{ p.hex }}" onInput="{{ p.onEdit }}" style="position: absolute; inset: -6px; width: 40px; height: 40px; border: none; padding: 0; cursor: pointer; opacity: 0;">
+                </label>
+                <span style="color: #7f9c96; width: 62px; font-size: 10px;">{{ p.slotLabel }}</span>
+                <input value="{{ p.hex }}" onChange="{{ p.onHexInput }}" spellcheck="false" style="background: #0a1213; color: #cfe0dc; border: 1px solid #1c2e30; border-radius: 3px; padding: 3px 5px; font-family: inherit; font-size: 11px; width: 72px; flex: 1; min-width: 0;">
+                <span style="color: #55716d; width: 44px; text-align: right;">{{ p.count }}px</span>
+                <select onChange="{{ p.onMerge }}" style="background: #0a1213; color: #7fd4c1; border: 1px solid #24393c; border-radius: 3px; padding: 3px 4px; font-family: inherit; font-size: 10px; cursor: pointer;">
+                  <option value="">merge→</option>
+                  <sc-for list="{{ p.mergeTargets }}" as="t" hint-placeholder-count="0">
+                    <option value="{{ t.idx }}">→ {{ t.hex }}</option>
+                  </sc-for>
+                </select>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input value="{{ spriteName }}" onChange="{{ onName }}" style="background: #0a1213; border: 1px solid #1c2e30; color: #cfe0dc; border-radius: 4px; padding: 7px 10px; font-family: inherit; font-size: 12px; width: 160px;">
+          <button onClick="{{ copyBlock }}" style="background: #1a2a2e; color: #7fd4c1; border: 1px solid #2c4448; border-radius: 4px; padding: 7px 12px; font-family: inherit; font-size: 11px; cursor: pointer;" style-hover="background: #21353a;">{{ copyLabel }}</button>
+          <button onClick="{{ downloadBlock }}" style="background: #1a2a2e; color: #7fd4c1; border: 1px solid #2c4448; border-radius: 4px; padding: 7px 12px; font-family: inherit; font-size: 11px; cursor: pointer;" style-hover="background: #21353a;">↓ .md</button>
+        </div>
+        <pre style="font-size: 12px; line-height: 1.5; color: #9fc4bc; background: #0a1213; border: 1px solid #1c2e30; border-radius: 4px; padding: 14px; overflow: auto; margin: 0; letter-spacing: 0.18em;">{{ block }}</pre>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hasError }}" hint-placeholder-val="{{ false }}">
+    <div style="background: #3a1a1a; border: 1px solid #7a3030; color: #f0b0b0; padding: 10px 14px; border-radius: 4px; font-size: 12px;">{{ errorText }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { src: null, binList: null, bgColor: null, palette: null,
+    maxColors: 5, entry: null, srcPng: '', name: 'sprite', copied: false, error: '', hover: null };
+
+  // ---------- helpers ----------
+  dist(a, b) { return Math.sqrt((a.r-b.r)**2 + (a.g-b.g)**2 + (a.b-b.b)**2); }
+  lum(c) { return 0.2126*c.r + 0.7152*c.g + 0.0722*c.b; }
+  hex(c) { return '#' + [c.r, c.g, c.b].map(v => Math.round(v).toString(16).padStart(2, '0')).join(''); }
+  parseHex(h) { h = h.replace('#',''); return { r: parseInt(h.slice(0,2),16), g: parseInt(h.slice(2,4),16), b: parseInt(h.slice(4,6),16) }; }
+  mixHex(h1, h2, t) {
+    const p = (h) => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+    const a = p(h1), b = p(h2);
+    return '#' + a.map((v, i) => Math.round(v + (b[i]-v)*t).toString(16).padStart(2,'0')).join('');
+  }
+  toBlobUrl(dataUrl) {
+    const b64 = dataUrl.split(',')[1], bin = atob(b64), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+  }
+
+  // ---------- pass 1: read source + build histogram + background ----------
+  loadSource(img, fileName) {
+    const W = Math.min(img.width, 160), H = Math.min(img.height, 160);
+    const fc = document.createElement('canvas'); fc.width = W; fc.height = H;
+    const fctx = fc.getContext('2d', { willReadFrequently: true });
+    fctx.imageSmoothingEnabled = false;
+    fctx.clearRect(0, 0, W, H);
+    fctx.drawImage(img, 0, 0, W, H);
+    const fd = fctx.getImageData(0, 0, W, H).data;
+
+    // histogram of EXACT source colors — no averaging, so palette entries are real pixels
+    const bins = new Map(); let alphaCount = 0;
+    for (let i = 0; i < W * H; i++) {
+      if (fd[i*4+3] < 128) { alphaCount++; continue; }
+      const r = fd[i*4], g = fd[i*4+1], b = fd[i*4+2];
+      const key = (r << 16) | (g << 8) | b;
+      let e = bins.get(key);
+      if (!e) { e = { r: r, g: g, b: b, n: 0 }; bins.set(key, e); }
+      e.n++;
+    }
+    const binList = [];
+    bins.forEach(e => binList.push({ r: e.r, g: e.g, b: e.b, n: e.n }));
+    binList.sort((a, b) => b.n - a.n);
+
+    const cornerAt = (x, y) => { const i = (y*W + x)*4; return { r: fd[i], g: fd[i+1], b: fd[i+2] }; };
+    let bgColor = null;
+    if (alphaCount === 0) {
+      const corners = [cornerAt(0,0), cornerAt(W-1,0), cornerAt(0,H-1), cornerAt(W-1,H-1)];
+      const close = corners.filter(c => this.dist(c, corners[0]) < 60);
+      if (close.length >= 3) bgColor = corners[0];
+    }
+    const name = (fileName || 'sprite').replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'sprite';
+    const src = { fd, W, H };
+    const palette = this.pickPalette(binList, bgColor, this.state.maxColors);
+    this.setState({ src, binList, bgColor, palette, name, error: '' }, () => this.finish());
+  }
+
+  // top-N well-separated colors from the histogram, background excluded
+  pickPalette(binList, bgColor, maxColors) {
+    const out = [];
+    binList.forEach(c => {
+      if (out.length >= maxColors) return;
+      if (bgColor && this.dist(c, bgColor) < 60) return;
+      if (out.some(p => this.dist(p, c) < 48)) return;
+      out.push({ r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) });
+    });
+    return out;
+  }
+
+  // ---------- pass 2: vote cells against current palette, assign slots, build block ----------
+  finish() {
+    const S = window.SIGIL8;
+    const { src, bgColor } = this.state;
+    if (!S || !src) return;
+    const { fd, W, H } = src;
+    let palette = this.state.palette.map(p => Object.assign({ n: 0, members: [] }, p));
+
+    const nearestIdx = (p) => {
+      let bi = 0, bd = 1e9;
+      palette.forEach((k, j) => { const dd = this.dist(p, k); if (dd < bd) { bd = dd; bi = j; } });
+      return bi;
+    };
+    const cellW = W / 8, cellH = H / 8;
+    for (let cy = 0; cy < 8; cy++) for (let cx = 0; cx < 8; cx++) {
+      const votes = new Array(palette.length).fill(0);
+      let bgVotes = 0, tot = 0;
+      const x0 = Math.floor(cx * cellW), x1 = Math.min(W, Math.max(x0 + 1, Math.ceil((cx + 1) * cellW)));
+      const y0 = Math.floor(cy * cellH), y1 = Math.min(H, Math.max(y0 + 1, Math.ceil((cy + 1) * cellH)));
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const i = (y*W + x)*4; tot++;
+        const p = { r: fd[i], g: fd[i+1], b: fd[i+2] };
+        if (fd[i+3] < 128 || (bgColor && this.dist(p, bgColor) < 60)) { bgVotes++; continue; }
+        votes[nearestIdx(p)]++;
+      }
+      let best = -1, bn = 0;
+      votes.forEach((v, j) => { if (v > bn) { bn = v; best = j; } });
+      if (best < 0 || bgVotes >= tot / 2) continue;
+      palette[best].n++; palette[best].members.push(cy * 8 + cx);
+    }
+
+    // winners only get slots; slot order: freq → hue(1); darkest → outline(5); lightest → eye(2); rest → 6,7,3,4
+    const winners = palette.filter(c => c.n > 0).sort((a, b) => b.n - a.n);
+    if (!winners.length) { this.setState({ error: 'no colors mapped — adjust palette', entry: null }); return; }
+    winners.forEach(c => c.role = null);
+    const hue = winners[0]; hue.role = '1';
+    let rest = winners.slice(1);
+    if (rest.length) {
+      const darkest = rest.reduce((m, c) => this.lum(c) < this.lum(m) ? c : m, rest[0]);
+      if (this.lum(darkest) < 120) { darkest.role = '5'; rest = rest.filter(c => c !== darkest); }
+    }
+    if (rest.length) {
+      const lightest = rest.reduce((m, c) => this.lum(c) > this.lum(m) ? c : m, rest[0]);
+      if (this.lum(lightest) > 190) { lightest.role = '2'; rest = rest.filter(c => c !== lightest); }
+    }
+    const spare = ['6', '7', '3', '4'];
+    rest.forEach(c => { c.role = spare.shift() || '1'; });
+
+    const grid = new Array(64).fill('.');
+    winners.forEach(c => c.members.forEach(i => { grid[i] = c.role; }));
+    const rows = [];
+    for (let y = 0; y < 8; y++) rows.push(grid.slice(y*8, y*8+8).join(''));
+
+    const SLOT_LINE = { '1': 'hue', '2': 'eye', '3': 'highlight', '4': 'shadow', '5': 'outline', '6': 'accent6', '7': 'accent7' };
+    const lines = [];
+    ['1','2','3','4','5','6','7'].forEach(role => {
+      const c = winners.find(k => k.role === role);
+      if (c) lines.push(SLOT_LINE[role] + ': "' + this.hex(c) + '"');
+    });
+    lines.push('bg: "' + (bgColor ? this.hex(bgColor) : this.mixHex(this.hex(hue), '#131d1d', 0.72)) + '"');
+    lines.push('assignment: custom', 'grid:');
+    const entry = { name: this.state.name, blockBody: lines.join('\n') + '\n' + rows.join('\n'), rows };
+
+    const sc = document.createElement('canvas'); sc.width = 8; sc.height = 8;
+    const sctx = sc.getContext('2d');
+    winners.forEach(c => {
+      sctx.fillStyle = this.hex(c);
+      c.members.forEach(i => sctx.fillRect(i % 8, Math.floor(i / 8), 1, 1));
+    });
+
+    // editor palette reflects live colors + winner slot/count; keep any zero-count entries too
+    const editorPalette = this.state.palette.map((p, idx) => {
+      const w = palette[idx];
+      return { r: p.r, g: p.g, b: p.b, count: w ? w.n : 0, role: w ? w.role : null, members: w ? w.members : [] };
+    });
+    this.setState({ entry, srcPng: this.toBlobUrl(sc.toDataURL()), palette: editorPalette, copied: false, error: '' });
+  }
+
+  // ---------- palette edits ----------
+  setMaxColors(n) {
+    n = Math.max(2, Math.min(15, n));
+    const palette = this.pickPalette(this.state.binList, this.state.bgColor, n);
+    this.setState({ maxColors: n, palette }, () => this.finish());
+  }
+  resetPalette() {
+    const palette = this.pickPalette(this.state.binList, this.state.bgColor, this.state.maxColors);
+    this.setState({ palette }, () => this.finish());
+  }
+  editColor(idx, hexStr) {
+    const palette = this.state.palette.map((p, i) => i === idx ? Object.assign({}, p, this.parseHex(hexStr)) : p);
+    this.setState({ palette }, () => this.finish());
+  }
+  mergeColor(fromIdx, intoIdx) {
+    // drop fromIdx entirely; its pixels re-vote to the nearest remaining color
+    const palette = this.state.palette.filter((_, i) => i !== fromIdx)
+      .map(p => ({ r: p.r, g: p.g, b: p.b }));
+    this.setState({ palette }, () => this.finish());
+  }
+
+  renderVals() {
+    const st = this.state;
+    const e = st.entry;
+    const SLOT_NAMES = { '1': 'body', '2': 'eye', '3': 'highlight', '4': 'shadow', '5': 'outline', '6': 'accent-A', '7': 'accent-B' };
+    const block = e ? 'name: ' + st.name + '\n' + e.blockBody : '';
+    const pal = st.palette || [];
+    return {
+      dropLabel: e ? 'drop another image — or click to browse' : 'drop an image here — or click to browse',
+      hasResult: !!e, hasError: !!st.error, errorText: st.error,
+      srcPng: st.srcPng,
+      spriteName: st.name,
+      maxColors: st.maxColors,
+      block,
+      cells: (() => {
+        const hv = st.hover != null ? pal[st.hover] : null;
+        const mem = hv && hv.members ? new Set(hv.members) : null;
+        const list = [];
+        for (let i = 0; i < 64; i++) {
+          list.push({
+            border: mem ? (mem.has(i) ? '1px solid rgba(255,255,255,0.95)' : '1px solid transparent') : '1px solid transparent',
+            bg: mem ? (mem.has(i) ? 'transparent' : 'rgba(6,12,14,0.66)') : 'transparent'
+          });
+        }
+        return list;
+      })(),
+      palette: pal.map((p, idx) => {
+        const hx = this.hex(p);
+        return {
+          hex: hx,
+          count: p.count || 0,
+          slotLabel: p.role ? p.role + ' ' + (SLOT_NAMES[p.role] || '') : '—',
+          mergeTargets: pal.map((q, j) => ({ idx: j, hex: this.hex(q) })).filter((_, j) => j !== idx),
+          onEnter: () => this.setState({ hover: idx }),
+          onLeave: () => this.setState({ hover: null }),
+          onEdit: (ev) => this.editColor(idx, ev.target.value),
+          onHexInput: (ev) => {
+            let v = ev.target.value.trim().replace(/^#/, '');
+            if (v.length === 3) v = v.split('').map(c => c + c).join('');
+            if (/^[0-9a-fA-F]{6}$/.test(v)) this.editColor(idx, '#' + v);
+            else this.forceUpdate();
+          },
+          onMerge: (ev) => { const v = ev.target.value; if (v !== '') this.mergeColor(idx, parseInt(v, 10)); }
+        };
+      }),
+      incColors: () => this.setMaxColors(st.maxColors + 1),
+      decColors: () => this.setMaxColors(st.maxColors - 1),
+      resetPalette: () => this.resetPalette(),
+      copyLabel: st.copied ? 'copied ✓' : 'copy block',
+      onName: (ev) => this.setState({ name: ev.target.value, entry: e ? Object.assign({}, e) : e, copied: false }),
+      copyBlock: () => { if (e) navigator.clipboard.writeText(block); this.setState({ copied: true }); },
+      downloadBlock: () => {
+        if (!e) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([block + '\n'], { type: 'text/markdown' }));
+        a.download = st.name + '-8x8.md'; a.click();
+      },
+      onFile: (ev) => {
+        const f = ev.target.files && ev.target.files[0];
+        if (!f) return;
+        if (!window.SIGIL8) { this.setState({ error: 'sprites8-data.js not loaded yet — try again' }); return; }
+        const url = URL.createObjectURL(f);
+        const img = new Image();
+        img.onload = () => { this.loadSource(img, f.name); URL.revokeObjectURL(url); };
+        img.onerror = () => this.setState({ error: 'could not read that file as an image' });
+        img.src = url;
+        ev.target.value = '';
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

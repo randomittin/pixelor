@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta charset="utf-8">
+  <title>Sigil — 8×8 Sprite Library</title>
+  <style>
+    body { margin: 0; background: #0d1416; }
+    a { color: #7fd4c1; } a:hover { color: #aef0e0; }
+    ::selection { background: rgba(127,212,193,0.3); }
+  </style>
+  <script src="sprites8-data.js"></script>
+</helmet>
+<div style="min-height: 100vh; background: {{ bg }}; color: #dfe9e6; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; padding: 28px 32px 64px 32px; box-sizing: border-box;">
+
+  <div data-screen-label="Header" style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 6px;">
+    <div style="font-size: 22px; font-weight: 700; letter-spacing: 0.04em; color: #f0f8ff;">HEIMDALL SIGIL</div>
+    <div style="font-size: 13px; color: #7fd4c1;">8×8 essentials tier · {{ total }} sprites · {{ famCount }} families</div>
+    <div style="flex: 1;"></div>
+    <button onClick="{{ downloadAll }}" style="background: #1a2a2e; color: #7fd4c1; border: 1px solid #2c4448; border-radius: 4px; padding: 8px 14px; font-family: inherit; font-size: 12px; cursor: pointer; letter-spacing: 0.05em;" style-hover="background: #21353a; color: #aef0e0;">↓ sprites-delivery-8x8.md</button>
+  </div>
+
+  <div style="font-size: 11px; color: #5d7a76; margin-bottom: 18px; display: flex; gap: 14px; flex-wrap: wrap;">
+    <span>. bg</span><span style="color: #9fb8b2;">1 body</span><span style="color: #f0f8ff;">2 eye</span><span style="color: #cfe6df;">3 highlight</span><span style="color: #6d8a85;">4 shadow</span><span>5 outline</span><span style="color: #d9a441;">6 accent-A</span><span style="color: #e08a9b;">7 accent-B</span>
+    <span style="color: #46605c;">· light source top-left · eyes always #f0f8ff · assignment: animal (pins on request)</span>
+  </div>
+
+  <sc-if value="{{ hasErrors }}" hint-placeholder-val="{{ false }}">
+    <div style="background: #3a1a1a; border: 1px solid #7a3030; color: #f0b0b0; padding: 10px 14px; border-radius: 4px; font-size: 12px; margin-bottom: 16px;">VALIDATION: {{ errorText }}</div>
+  </sc-if>
+
+  <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 22px;">
+    <sc-for list="{{ chips }}" as="chip" hint-placeholder-count="8">
+      <button onClick="{{ chip.pick }}" style="background: {{ chip.bg }}; color: {{ chip.fg }}; border: 1px solid #24393c; border-radius: 3px; padding: 5px 10px; font-family: inherit; font-size: 11px; cursor: pointer; letter-spacing: 0.04em;" style-hover="border-color: #3d5c60;">{{ chip.label }}</button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ ready }}" hint-placeholder-val="{{ false }}">
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax({{ cardMin }}, 1fr)); gap: 10px;">
+      <sc-for list="{{ list }}" as="s" hint-placeholder-count="0">
+        <div onClick="{{ s.pick }}" style="background: #121c1e; border: {{ s.cardBorder }}; border-radius: 5px; padding: 12px 8px 9px 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;" style-hover="background: #162326;">
+          <div role="img" aria-label="{{ s.name }}" style="width: {{ px }}; height: {{ px }}; background-image: url({{ s.png }}); background-size: contain; background-repeat: no-repeat; image-rendering: pixelated;"></div>
+          <sc-if value="{{ showNames }}" hint-placeholder-val="{{ true }}">
+            <div style="text-align: center;">
+              <div style="font-size: 11px; color: #cfe0dc; overflow-wrap: anywhere;">{{ s.name }}</div>
+              <div style="font-size: 10px; color: #55716d; display: flex; align-items: center; gap: 5px; justify-content: center; margin-top: 3px;">
+                <span style="width: 8px; height: 8px; background: {{ s.hue }}; display: inline-block; border-radius: 2px;"></span>
+                <span>{{ s.hue }}</span>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+  <sc-if value="{{ notReady }}" hint-placeholder-val="{{ true }}">
+    <div style="color: #46605c; font-size: 13px; padding: 40px 0;">composing sprites…</div>
+  </sc-if>
+
+  <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Detail" style="position: fixed; top: 0; right: 0; bottom: 0; width: 340px; background: #0f1a1c; border-left: 1px solid #24393c; padding: 20px; box-sizing: border-box; overflow: auto; box-shadow: -12px 0 32px rgba(0,0,0,0.45);">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+        <div role="img" aria-label="{{ selName }}" style="width: 64px; height: 64px; background-image: url({{ selPng }}); background-size: contain; background-repeat: no-repeat; image-rendering: pixelated;"></div>
+        <div style="flex: 1;">
+          <div style="font-size: 14px; color: #f0f8ff; font-weight: 700;">{{ selName }}</div>
+          <div style="font-size: 11px; color: {{ selHue }};">{{ selHue }}</div>
+        </div>
+        <button onClick="{{ closeSel }}" style="background: none; border: 1px solid #2c4448; color: #7fd4c1; border-radius: 3px; width: 26px; height: 26px; cursor: pointer; font-family: inherit;">×</button>
+      </div>
+      <button onClick="{{ copySel }}" style="background: #1a2a2e; color: #7fd4c1; border: 1px solid #2c4448; border-radius: 4px; padding: 7px 12px; font-family: inherit; font-size: 11px; cursor: pointer; margin-bottom: 12px;">{{ copyLabel }}</button>
+      <pre style="font-size: 11px; line-height: 1.45; color: #9fc4bc; background: #0a1213; border: 1px solid #1c2e30; border-radius: 4px; padding: 12px; overflow: auto; margin: 0; letter-spacing: 0.14em;">{{ selBlock }}</pre>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;view&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;front&quot;, &quot;options&quot;: [&quot;front&quot;, &quot;iso&quot;], &quot;section&quot;: &quot;Sprites&quot; },
+  &quot;spriteBg&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;shaded&quot;, &quot;options&quot;: [&quot;shaded&quot;, &quot;none&quot;], &quot;section&quot;: &quot;Sprites&quot; },
+  &quot;scale&quot;: { &quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 8, &quot;min&quot;: 4, &quot;max&quot;: 16, &quot;step&quot;: 1, &quot;unit&quot;: &quot;×&quot;, &quot;section&quot;: &quot;Preview&quot; },
+  &quot;showNames&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;section&quot;: &quot;Preview&quot; },
+  &quot;bg&quot;: { &quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#0d1416&quot;, &quot;options&quot;: [&quot;#0d1416&quot;, &quot;#131d1d&quot;, &quot;#1a1410&quot;, &quot;#101423&quot;], &quot;section&quot;: &quot;Preview&quot; }
+}">
+class Component extends DCLogic {
+  state = { ready: false, spritesByView: {}, errors: [], filter: 'all', selected: null, copied: false };
+
+  componentDidMount() {
+    this._t = setInterval(() => {
+      if (window.SIGIL8) { clearInterval(this._t); this.build(); }
+    }, 60);
+  }
+  componentWillUnmount() { clearInterval(this._t); }
+
+  build() {
+    const S = window.SIGIL8;
+    const errors = S.validate('front').concat(S.validate('iso'));
+    const toBlobUrl = (dataUrl) => {
+      const b64 = dataUrl.split(',')[1];
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+    };
+    const mk = (view, withBg) => S.all(view).map(e => Object.assign({}, e, { png: toBlobUrl(S.toDataUrl(e, withBg)) }));
+    this.setState({ ready: true, spritesByView: {
+      front_bg: mk('front', true), front_plain: mk('front', false),
+      iso_bg: mk('iso', true), iso_plain: mk('iso', false)
+    }, errors });
+  }
+
+  renderVals() {
+    const scale = this.props.scale ?? 8;
+    const bg = this.props.bg ?? '#0d1416';
+    const showNames = this.props.showNames ?? true;
+    const view = this.props.view === 'iso' ? 'iso' : 'front';
+    const st = this.state;
+    st.sprites = st.spritesByView[view + (this.props.spriteBg === 'none' ? '_plain' : '_bg')] || [];
+    const famNames = window.SIGIL8 ? window.SIGIL8.familyNames() : [];
+    const chips = ['all'].concat(famNames).map(f => ({
+      label: f,
+      bg: st.filter === f ? '#21444a' : '#121c1e',
+      fg: st.filter === f ? '#aef0e0' : '#6f8f8a',
+      pick: () => this.setState({ filter: f, selected: null })
+    }));
+    const list = st.sprites
+      .filter(s => st.filter === 'all' || s.family === st.filter)
+      .map(s => Object.assign({}, s, {
+        cardBorder: st.selected === s.name ? '1px solid ' + s.hue : '1px solid #1c2e30',
+        pick: () => this.setState({ selected: st.selected === s.name ? null : s.name, copied: false })
+      }));
+    const sel = st.sprites.find(s => s.name === st.selected);
+    return {
+      bg, chips, list, showNames,
+      ready: st.ready, notReady: !st.ready,
+      total: st.sprites.length || 154,
+      famCount: famNames.length || 22,
+      px: (8 * scale) + 'px',
+      cardMin: (8 * scale + 24) + 'px',
+      hasErrors: st.errors.length > 0,
+      errorText: st.errors.slice(0, 12).join(' · '),
+      hasSel: !!sel,
+      selName: sel ? sel.name : '',
+      selHue: sel ? sel.hue : '#fff',
+      selPng: sel ? sel.png : '',
+      selBlock: sel ? window.SIGIL8.deliveryBlock(sel) : '',
+      copyLabel: st.copied ? 'copied ✓' : 'copy delivery block',
+      copySel: () => {
+        if (sel) navigator.clipboard.writeText(window.SIGIL8.deliveryBlock(sel));
+        this.setState({ copied: true });
+      },
+      closeSel: () => this.setState({ selected: null }),
+      downloadAll: () => {
+        const t = window.SIGIL8.deliveryText(view);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([t], { type: 'text/markdown' }));
+        a.download = 'sprites-delivery-8x8.md';
+        a.click();
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
