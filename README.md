@@ -17,7 +17,10 @@ top-N color palette, majority-votes each 8×8 cell, and emits a text delivery bl
    color is treated as bg.
 2. Tune **MAX COLORS**, edit palette hex values, or **merge** near-duplicate colors — the grid
    re-votes live.
-3. **copy block** or **↓ .md** to export the delivery block.
+3. **Paint** individual pixels: pick a color in the **PAINT** bar, then click pixels in the 8×8
+   preview to set them. Click a filled pixel with its own color to erase it back to bg (`.`).
+   (Re-quantizing — changing MAX COLORS / palette — resets the grid, so paint last.)
+4. **copy block** or **↓ .md** to export the delivery block.
 
 ## How it works
 

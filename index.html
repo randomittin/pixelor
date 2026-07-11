@@ -43,14 +43,24 @@
           <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
             <div style="position: relative; width: 200px; height: 200px; border: 1px solid #1c2e30;">
               <div role="img" aria-label="quantized sprite" style="position: absolute; inset: 0; background-image: url({{ srcPng }}); background-size: contain; background-repeat: no-repeat; image-rendering: pixelated;"></div>
-              <div style="position: absolute; inset: 0; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); pointer-events: none;">
+              <div style="position: absolute; inset: 0; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);">
                 <sc-for list="{{ cells }}" as="c" hint-placeholder-count="64">
-                  <div style="box-sizing: border-box; border: {{ c.border }}; background: {{ c.bg }};"></div>
+                  <div onClick="{{ c.onClick }}" style="box-sizing: border-box; border: {{ c.border }}; background: {{ c.bg }}; cursor: pointer;" style-hover="border: 1px solid rgba(127,212,193,0.9);"></div>
                 </sc-for>
               </div>
             </div>
-            <div style="font-size: 10px; color: #55716d;">8×8 · quantized to palette</div>
+            <div style="font-size: 10px; color: #55716d;">8×8 · click a pixel to paint with the active color</div>
           </div>
+        </div>
+
+        <div style="background: #121c1e; border: 1px solid #1c2e30; border-radius: 5px; padding: 12px 14px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+            <span style="font-size: 11px; color: #cfe0dc; letter-spacing: 0.05em;">PAINT</span>
+            <sc-for list="{{ brushes }}" as="b" hint-placeholder-count="0">
+              <button onClick="{{ b.onPick }}" title="{{ b.label }}" style="width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 700; background: {{ b.hex }}; color: {{ b.fg }}; border: {{ b.border }};">{{ b.char }}</button>
+            </sc-for>
+          </div>
+          <div style="font-size: 10px; color: #55716d;">pick a color → click pixels in the preview · click a filled pixel with its own color to erase to bg (.)</div>
         </div>
 
         <div style="background: #121c1e; border: 1px solid #1c2e30; border-radius: 5px; padding: 12px 14px;">
@@ -103,7 +113,8 @@
 <script type="text/x-dc" data-dc-script>
 class Component extends DCLogic {
   state = { src: null, binList: null, bgColor: null, palette: null,
-    maxColors: 5, entry: null, srcPng: '', name: 'sprite', copied: false, error: '', hover: null };
+    maxColors: 5, entry: null, srcPng: '', name: 'sprite', copied: false, error: '', hover: null,
+    grid: null, slotHex: {}, bgHex: '', brush: '1' };
 
   // ---------- helpers ----------
   dist(a, b) { return Math.sqrt((a.r-b.r)**2 + (a.g-b.g)**2 + (a.b-b.b)**2); }
@@ -248,32 +259,48 @@ class Component extends DCLogic {
 
     const grid = new Array(64).fill('.');
     winners.forEach(c => c.members.forEach(i => { grid[i] = c.role; }));
-    const rows = [];
-    for (let y = 0; y < 8; y++) rows.push(grid.slice(y*8, y*8+8).join(''));
 
-    const SLOT_LINE = { '1': 'hue', '2': 'eye', '3': 'highlight', '4': 'shadow', '5': 'outline', '6': 'accent6', '7': 'accent7' };
-    const lines = [];
-    ['1','2','3','4','5','6','7'].forEach(role => {
-      const c = winners.find(k => k.role === role);
-      if (c) lines.push(SLOT_LINE[role] + ': "' + this.hex(c) + '"');
-    });
-    lines.push('bg: "' + (bgColor ? this.hex(bgColor) : this.mixHex(this.hex(hue), '#131d1d', 0.72)) + '"');
-    lines.push('assignment: custom', 'grid:');
-    const entry = { name: this.state.name, blockBody: lines.join('\n') + '\n' + rows.join('\n'), rows };
-
-    const sc = document.createElement('canvas'); sc.width = 8; sc.height = 8;
-    const sctx = sc.getContext('2d');
-    winners.forEach(c => {
-      sctx.fillStyle = this.hex(c);
-      c.members.forEach(i => sctx.fillRect(i % 8, Math.floor(i / 8), 1, 1));
-    });
+    // slot -> hex map + background hex — the single source of truth for both the
+    // delivery block and the editable preview.
+    const slotHex = {};
+    winners.forEach(c => { if (c.role) slotHex[c.role] = this.hex(c); });
+    const bgHex = bgColor ? this.hex(bgColor) : this.mixHex(this.hex(hue), '#131d1d', 0.72);
+    const entry = this.buildEntry(grid, slotHex, bgHex, this.state.name);
 
     // editor palette reflects live colors + winner slot/count; keep any zero-count entries too
     const editorPalette = this.state.palette.map((p, idx) => {
       const w = palette[idx];
       return { r: p.r, g: p.g, b: p.b, count: w ? w.n : 0, role: w ? w.role : null, members: w ? w.members : [] };
     });
-    this.setState({ entry, srcPng: this.toBlobUrl(sc.toDataURL()), palette: editorPalette, copied: false, error: '' });
+    this.setState({ entry, grid, slotHex, bgHex, palette: editorPalette, copied: false, error: '' });
+  }
+
+  // Build the delivery block from a grid (64 slot chars) + slot->hex map. Header
+  // lists only the slots actually present in the grid, so hand-painting that
+  // removes a slot's last pixel also drops its color line. Used by both the
+  // auto-quantizer and manual pixel painting.
+  buildEntry(grid, slotHex, bgHex, name) {
+    const SLOT_LINE = { '1': 'hue', '2': 'eye', '3': 'highlight', '4': 'shadow', '5': 'outline', '6': 'accent6', '7': 'accent7' };
+    const used = new Set(grid.filter(ch => ch !== '.'));
+    const lines = [];
+    ['1','2','3','4','5','6','7'].forEach(role => {
+      if (used.has(role) && slotHex[role]) lines.push(SLOT_LINE[role] + ': "' + slotHex[role] + '"');
+    });
+    lines.push('bg: "' + bgHex + '"');
+    lines.push('assignment: custom', 'grid:');
+    const rows = [];
+    for (let y = 0; y < 8; y++) rows.push(grid.slice(y*8, y*8+8).join(''));
+    return { name, blockBody: lines.join('\n') + '\n' + rows.join('\n'), rows };
+  }
+
+  // ---------- manual pixel painting ----------
+  setBrush(ch) { this.setState({ brush: ch }); }
+  paintCell(i) {
+    if (!this.state.grid) return;
+    const grid = this.state.grid.slice();
+    grid[i] = grid[i] === this.state.brush ? '.' : this.state.brush; // click same brush again = erase to bg
+    const entry = this.buildEntry(grid, this.state.slotHex, this.state.bgHex, this.state.name);
+    this.setState({ grid, entry, copied: false });
   }
 
   // ---------- palette edits ----------
@@ -311,16 +338,40 @@ class Component extends DCLogic {
       maxColors: st.maxColors,
       block,
       cells: (() => {
+        const grid = st.grid || new Array(64).fill('.');
+        const slotHex = st.slotHex || {};
+        const bgHex = st.bgHex || '#0d1416';
+        const colorOf = (ch) => ch === '.' ? bgHex : (slotHex[ch] || '#ff00ff');
         const hv = st.hover != null ? pal[st.hover] : null;
         const mem = hv && hv.members ? new Set(hv.members) : null;
         const list = [];
         for (let i = 0; i < 64; i++) {
           list.push({
-            border: mem ? (mem.has(i) ? '1px solid rgba(255,255,255,0.95)' : '1px solid transparent') : '1px solid transparent',
-            bg: mem ? (mem.has(i) ? 'transparent' : 'rgba(6,12,14,0.66)') : 'transparent'
+            // solid slot color so manual paint shows instantly; hovering a palette
+            // row still rings that color's cells in white.
+            bg: colorOf(grid[i]),
+            border: mem && mem.has(i) ? '1px solid rgba(255,255,255,0.95)' : '1px solid rgba(0,0,0,0.18)',
+            onClick: () => this.paintCell(i)
           });
         }
         return list;
+      })(),
+      brushes: (() => {
+        const slotHex = st.slotHex || {};
+        const bgHex = st.bgHex || '#0d1416';
+        const chars = ['.', '1', '2', '3', '4', '5', '6', '7'];
+        return chars.filter(ch => ch === '.' || slotHex[ch]).map(ch => {
+          const hx = ch === '.' ? bgHex : slotHex[ch];
+          const c = this.parseHex(hx);
+          return {
+            char: ch,
+            hex: hx,
+            fg: this.lum(c) < 130 ? '#dfe9e6' : '#0a1213',
+            label: ch === '.' ? 'bg' : (ch + ' ' + (SLOT_NAMES[ch] || '')),
+            border: st.brush === ch ? '2px solid #7fd4c1' : '1px solid #24393c',
+            onPick: () => this.setBrush(ch)
+          };
+        });
       })(),
       palette: pal.map((p, idx) => {
         const hx = this.hex(p);
@@ -345,7 +396,7 @@ class Component extends DCLogic {
       decColors: () => this.setMaxColors(st.maxColors - 1),
       resetPalette: () => this.resetPalette(),
       copyLabel: st.copied ? 'copied ✓' : 'copy block',
-      onName: (ev) => this.setState({ name: ev.target.value, entry: e ? Object.assign({}, e) : e, copied: false }),
+      onName: (ev) => this.setState({ name: ev.target.value, copied: false }),
       copyBlock: () => { if (e) navigator.clipboard.writeText(block); this.setState({ copied: true }); },
       downloadBlock: () => {
         if (!e) return;
