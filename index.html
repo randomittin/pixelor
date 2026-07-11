@@ -150,7 +150,24 @@ class Component extends DCLogic {
     if (alphaCount === 0) {
       const corners = [cornerAt(0,0), cornerAt(W-1,0), cornerAt(0,H-1), cornerAt(W-1,H-1)];
       const close = corners.filter(c => this.dist(c, corners[0]) < 60);
-      if (close.length >= 3) bgColor = corners[0];
+      if (close.length >= 3) {
+        // A real background FRAMES the subject — it hugs the edges but is largely
+        // absent from the center. A full-bleed sprite (e.g. a Minecraft face that
+        // fills the whole tile) has its dominant color in the center too — that's a
+        // subject color, not background, and must NOT be dropped. So only accept the
+        // corner color as bg when it barely appears in the central region.
+        const cand = corners[0];
+        const cx0 = Math.floor(W * 0.3), cx1 = Math.ceil(W * 0.7);
+        const cy0 = Math.floor(H * 0.3), cy1 = Math.ceil(H * 0.7);
+        let cHit = 0, cTot = 0;
+        for (let y = cy0; y < cy1; y++) for (let x = cx0; x < cx1; x++) {
+          const i = (y*W + x)*4;
+          if (fd[i+3] < 128) continue;
+          cTot++;
+          if (this.dist({ r: fd[i], g: fd[i+1], b: fd[i+2] }, cand) < 60) cHit++;
+        }
+        if (cTot > 0 && cHit / cTot < 0.30) bgColor = cand;
+      }
     }
     const name = (fileName || 'sprite').replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'sprite';
     const src = { fd, W, H };
